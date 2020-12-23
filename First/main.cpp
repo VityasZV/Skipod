@@ -25,9 +25,12 @@ int main (int argc, char* argv[])
         boost::filesystem::create_directory("build/" + server_dir); //creating "server directory"
         boost::filesystem::path full_path(boost::filesystem::current_path()/"build");
         boost::filesystem::copy_file(full_path/"test.txt", full_path/server_dir/("test"+std::to_string(file_array[rank-1])+".txt"), boost::filesystem::copy_option::overwrite_if_exists);
-        for (int i = 0; i < rank; ++i) {
+        std::fstream file((full_path/server_dir/("test"+std::to_string(file_array[rank-1])+".txt")).string());
 
-        }
+        char x;
+        file.read(&x, 1);
+        file.close();
+        std::cout << "process" << std::to_string(rank) << " read " << x << std::endl;
     }
 
     /* get number of processes */
