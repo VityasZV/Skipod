@@ -32,10 +32,10 @@ int main (int argc, char* argv[])
             }
             std::cout << "after send" << std::endl; 
             for (int j = 1; j <= cuorum_write; ++j) {
-                MPI_Recv(&file_version_and_process[0], 2, MPI_INT, j, 0, MPI_COMM_WORLD, &status); //getting file_versions and ids of processes
-                std::cout << "received " << file_version_and_process[0] << " " << file_version_and_process[1] << std::endl;
+                MPI_Recv(file_version_and_process.data(), 2, MPI_INT, j, 0, MPI_COMM_WORLD, &status); //getting file_versions and ids of processes
+                std::cout << "received1 " << file_version_and_process[0] << " " << file_version_and_process[1] << std::endl;
                 file_versions_and_proceses[j-1] = file_version_and_process;
-                std::cout << "received " << file_versions_and_proceses[j-1][0] << " " << file_versions_and_proceses[j-1][1] << std::endl;
+                std::cout << "received2 " << file_versions_and_proceses[j-1][0] << " " << file_versions_and_proceses[j-1][1] << std::endl;
             }
             std::cout << "write Request: " << std::endl;
             for (int j = 0 ; j < file_versions_and_proceses.size(); ++j) {
@@ -63,7 +63,7 @@ int main (int argc, char* argv[])
                 if (request == 1) {
                     //write request
                     std::cout << "Version and rank = " << file_version_and_process[0] << " " << file_version_and_process[1];
-                    MPI_Send(&file_version_and_process, 2, MPI_INT, 0, 0, MPI_COMM_WORLD); 
+                    MPI_Send(file_version_and_process.data(), 2, MPI_INT, 0, 0, MPI_COMM_WORLD); 
                     std::cout << "sended from " << rank; 
                 }
             }
