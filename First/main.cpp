@@ -11,7 +11,7 @@
 int main (int argc, char* argv[])
 {
     int rank = 0, size = 0, N = 300;
-    int cuorum_read = 8, cuorum_write = 5, all_voices = 11;
+    int cuorum_read = 3, cuorum_write = 10, all_voices = 11;
     int Ts=100, Tb=1;
     //all amount of processes is 12, 0 for main process, 11 - file servers
     MPI_Init (&argc, &argv);      /* starts MPI */
@@ -40,6 +40,50 @@ int main (int argc, char* argv[])
             std::cout << "write Request: " << std::endl;
             for (int j = 0 ; j < file_versions_and_proceses.size(); ++j) {
                 std::cout << file_versions_and_proceses[j][0] << " " << file_versions_and_proceses[j][1] << std::endl;
+                auto max_element = [&](){
+                    int max_version = 0, process_id = 0;
+                    for (auto &v_p : file_versions_and_proceses) {
+                        if (v_p[0] >= max_version) {
+                            max_version = v_p[0];
+                            process_id = v_p[1];
+                        }
+                    }
+                    return std::pair<int, int>{max_version, process_id};
+                }();
+                int new_version = max_element.first+1;
+                int process_id = max_element.second;
+                std::string text = [](){
+                    auto s = std::string("f");
+                    for (int i = 1; i <= 300; ++i) {
+                        s = s + "f";
+                    }
+                    return s;
+                }();
+                boost::filesystem::path full_path(boost::filesystem::current_path()/"build");
+                std::fstream file((full_path/("test"+std::to_string(process_id))/("test"+std::to_string(new_version-1)+".txt")).string());
+                file << text;
+                file.close();
+                boost::filesystem::copy_file((full_path/("test"+std::to_string(process_id))/("test"+std::to_string(new_version-1)+".txt")), (full_path/("test"+std::to_string(process_id))/("test"+std::to_string(new_version)+".txt")), boost::filesystem::copy_option::overwrite_if_exists);
+                boost::filesystem::remove(full_path/("test"+std::to_string(process_id))/("test"+std::to_string(new_version-1)+".txt"));
+                int update = 2;
+                for (int p = 1; p <= 12; ++p) {
+                    MPI_Send(&update, 1, MPI_INT, p, 0, MPI_COMM_WORLD); //sending update request
+                }
+                std::vector<int> v_p;
+                v_p.resize(2);
+                v_p[0] = new_version;
+                v_p[1] = process_id;
+                for (int p = 1; p <= 12; ++p) {
+                    MPI_Send(&update, 1, MPI_INT, p, 0, MPI_COMM_WORLD); //sending update request
+                }
+                for (int p = 1; p <= 12; ++p) {
+                    MPI_Send(&v_p, 2, MPI_INT, p, 0, MPI_COMM_WORLD); //sending update request
+                }
+                // char x;
+                // file.read(&x, 1);
+                // file.close();
+                // std::cout << "process" << std::to_string(rank) << " read " << x << std::endl;
+                //Recieve request from master process
             }
         }
     }
@@ -57,17 +101,31 @@ int main (int argc, char* argv[])
         // std::cout << "process" << std::to_string(rank) << " read " << x << std::endl;
         //Recieve request from master process
         std::cout << "start rank " << rank<< std::endl;
-        if (rank >= 1 && rank <= 5) {
-            for (int i = 0; i < 3; ++i) {
-                MPI_Recv(&request, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
-                if (request == 1) {
-                    //write request
-                    std::cout << "Version and rank = " << file_version_and_process[0] << " " << file_version_and_process[1];
-                    MPI_Send(file_version_and_process.data(), 2, MPI_INT, 0, 0, MPI_COMM_WORLD); 
-                    std::cout << "sended from " << rank; 
-                }
+        while (true) {
+            MPI_Recv(&request, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
+            if (request == 1) {
+                //write request
+                std::cout << "Version and rank = " << file_version_and_process[0] << " " << file_version_and_process[1];
+                MPI_Send(file_version_and_process.data(), 2, MPI_INT, 0, 0, MPI_COMM_WORLD); 
+                std::cout << "sended from " << rank; 
             }
-        } 
+            else if (request == 0) {
+                //read request
+                std::cout << "Version and rank = " << file_version_and_process[0] << " " << file_version_and_process[1];
+                MPI_Send(file_version_and_process.data(), 2, MPI_INT, 0, 0, MPI_COMM_WORLD); 
+            }
+            else if (request == 2){
+                //update request 
+                std::vector<int> file_v_and_pid (2, 0);
+                MPI_Recv(file_v_and_pid.data(), 2, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
+                boost::filesystem::copy_file(full_path/("test" + std::to_string(file_v_and_pid[1]))/("test" + std::to_string(file_v_and_pid[0]) + ".txt"), full_path/server_dir/("test"+std::to_string(file_v_and_pid[0])+".txt"), boost::filesystem::copy_option::overwrite_if_exists);
+                boost::filesystem::remove(full_path/server_dir/("test"+std::to_string(file_v_and_pid[0])+".txt"));
+            }
+            else if (request == 3) {
+                //stop request
+                break;
+            }
+        }
     }
     /* get number of processes */
     MPI_Finalize();

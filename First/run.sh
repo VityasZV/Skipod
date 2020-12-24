@@ -1,2 +1,2 @@
 #!/bin/bash -x
-mpirun -n 11 ./build/First
+mpirun -n 12 ./build/First
